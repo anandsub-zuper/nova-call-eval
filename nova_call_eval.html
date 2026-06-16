@@ -130,11 +130,15 @@
     <div class="stack-col" id="configCards">
       <!-- config cards injected here -->
       <div class="card">
-        <div class="card-h"><span class="num">4</span><span class="dot" style="background:var(--prompt)"></span><span class="ttl">Agent prompt</span></div>
-        <textarea id="prompt" rows="6" placeholder="Paste the deployed system prompt for this call flow…"></textarea>
+        <div class="card-h"><span class="num">4</span><span class="dot" style="background:var(--prompt)"></span><span class="ttl">Agent prompt</span><span class="meta">behavior only — no KB</span></div>
+        <textarea id="prompt" rows="6" placeholder="Paste the deployed system prompt (personality, FSM, guardrails) — keep the Knowledge Base out of here; it has its own box below."></textarea>
       </div>
       <div class="card">
-        <div class="card-h"><span class="num">5</span><span class="dot" style="background:var(--arch)"></span><span class="ttl">Call transcript</span><span class="ts" id="tsBadge" style="display:none"></span></div>
+        <div class="card-h"><span class="num">5</span><span class="dot" style="background:var(--config)"></span><span class="ttl">Knowledge Base</span><span class="meta">optional</span></div>
+        <textarea id="kb" rows="5" placeholder="Optional. Paste the KB the agent answers from (pricing, hours, warranty, services…). Used only to check whether KB-grounded answers were correct — kept separate so it doesn't dilute prompt scoring."></textarea>
+      </div>
+      <div class="card">
+        <div class="card-h"><span class="num">6</span><span class="dot" style="background:var(--arch)"></span><span class="ttl">Call transcript</span><span class="ts" id="tsBadge" style="display:none"></span></div>
         <textarea id="transcript" rows="8" placeholder="Paste the RAW diarized, timestamped output from your STT (not a cleaned transcript — cleaning hides the overlaps). Keep speaker labels + [m:ss] timestamps."></textarea>
         <div class="savenote">Tip: raw ASR output preserves who-spoke-when, including talk-overs — that's what reveals turn-taking issues.</div>
         <div class="metarow">
@@ -255,6 +259,7 @@ GROUPS.forEach(g=>{
 });
 
 const promptEl=document.getElementById("prompt"),transEl=document.getElementById("transcript"),tsBadge=document.getElementById("tsBadge");
+const kbEl=document.getElementById("kb");
 const pvEl=document.getElementById("pv"),clEl=document.getElementById("cl");
 
 function setVal(el,val){
@@ -264,7 +269,7 @@ function setVal(el,val){
   el.value=val;
 }
 function readAll(){
-  const o={stack:{},tune:{},prompt:promptEl.value,transcript:transEl.value,promptVersion:pvEl.value,configLabel:clEl.value};
+  const o={stack:{},tune:{},prompt:promptEl.value,kb:kbEl.value,transcript:transEl.value,promptVersion:pvEl.value,configLabel:clEl.value};
   GROUPS.forEach(g=>g.fields.forEach(f=>{const el=document.querySelector(`[data-key="${f.key}"]`);o[g.bucket][f.key]=el?el.value:"";}));
   return o;
 }
@@ -272,6 +277,7 @@ function writeAll(d){
   if(!d)return;
   GROUPS.forEach(g=>g.fields.forEach(f=>{const el=document.querySelector(`[data-key="${f.key}"]`);if(el&&d[g.bucket]&&d[g.bucket][f.key]!=null)setVal(el,d[g.bucket][f.key]);}));
   if(d.prompt!=null)promptEl.value=d.prompt;
+  if(d.kb!=null)kbEl.value=d.kb;
   if(d.transcript!=null)transEl.value=d.transcript;
   if(d.promptVersion!=null)pvEl.value=d.promptVersion;
   if(d.configLabel!=null)clEl.value=d.configLabel;
@@ -279,7 +285,7 @@ function writeAll(d){
 }
 function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(readAll()));}catch(e){}}
 function restore(){try{const r=localStorage.getItem(LS_KEY);if(r)writeAll(JSON.parse(r));}catch(e){}}
-document.addEventListener("input",e=>{if(e.target.matches('[data-key],#prompt,#transcript,#pv,#cl'))save();});
+document.addEventListener("input",e=>{if(e.target.matches('[data-key],#prompt,#kb,#transcript,#pv,#cl'))save();});
 document.addEventListener("change",e=>{if(e.target.matches('[data-key]'))save();});
 
 function updateTs(){const t=transEl.value;if(!t){tsBadge.style.display="none";return;}
@@ -338,7 +344,7 @@ Use timestamps as evidence for turn-taking. If NO timestamps, state turn-taking 
 Return ONLY valid JSON, no markdown, no preamble:
 {"scorecard":{"turn_management":0,"confirmation":0,"entity_capture":0,"empathy":0,"naturalness":0,"task_completion":0,"overall":0},"issues":[{"title":"short","owner":"Prompt|Config|Architecture","severity":"high|medium|low","evidence":"quote/timestamp","fix":"specific; name provider/value"}],"summary":"2 sentences naming the single highest-leverage fix"}
 Limit to 6 highest-leverage issues. Be concise.`;
-  const user=`=== STACK ===\n${stackText}\n\n=== TUNING ===\n${tuneText}\n\n=== AGENT PROMPT ===\n${d.prompt||"(none provided)"}\n\n=== TRANSCRIPT ===\n${transcript}`;
+  const user=`=== STACK ===\n${stackText}\n\n=== TUNING ===\n${tuneText}\n\n=== AGENT PROMPT (behavior — grade this) ===\n${d.prompt||"(none provided)"}\n\n=== KNOWLEDGE BASE (reference only — use to check whether KB-grounded answers were factually correct; do NOT grade the agent's behavior against KB completeness) ===\n${d.kb&&d.kb.trim()?d.kb:"(not provided)"}\n\n=== TRANSCRIPT ===\n${transcript}`;
   try{
     const res=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({model:JUDGE_MODEL,max_tokens:2000,temperature:0,messages:[{role:"user",content:sys+"\n\n"+user}]})});

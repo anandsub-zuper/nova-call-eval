@@ -17,7 +17,7 @@ const PORT    = process.env.PORT || 3000;                            // Render s
 
 if (!API_KEY) { console.error("Set ANTHROPIC_API_KEY before starting."); process.exit(1); }
 
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "10mb" }));
 
 // Serve the tool and inject the proxy endpoint so the HTML needs no edits.
 app.get("/", (req, res) => {
@@ -43,11 +43,12 @@ app.post("/api/eval", async (req, res) => {
       },
       body: JSON.stringify(body),
     });
-    const data = await r.json();
-    res.status(r.status).json(data);
+    const txt = await r.text();
+    // Pass the upstream status and body straight through so the page shows the real error.
+    res.status(r.status).type("application/json").send(txt);
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "proxy_failed" });
+    console.error("proxy_failed:", e);
+    res.status(502).json({ error: { message: "proxy_failed: " + (e && e.message ? e.message : String(e)) } });
   }
 });
 
