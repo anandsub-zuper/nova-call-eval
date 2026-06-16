@@ -33,7 +33,7 @@ app.use(express.static(__dirname));
 // Eval proxy: browser POSTs the Anthropic message body; we add the key and forward.
 app.post("/api/eval", async (req, res) => {
   try {
-    const body = { ...req.body, model: req.body.model || MODEL, max_tokens: req.body.max_tokens || 1500 };
+    const body = { ...req.body, model: req.body.model || MODEL, max_tokens: req.body.max_tokens || 2000 };
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
