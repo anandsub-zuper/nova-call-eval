@@ -1,0 +1,32 @@
+{
+  "stack": {
+    "stt": "Deepgram",
+    "stt_model": "",
+    "tts": "Cartesia",
+    "orchestration": "Custom orchestrator",
+    "llm": "gpt-realtime-1.5",
+    "realtime_mode": "Text in/out (external STT+TTS)",
+    "telephony": "Plivo",
+    "audio_codec": ""
+  },
+  "tune": {
+    "turn_detection_owner": "Deepgram EOT",
+    "eot": "0.8",
+    "eot_timeout_ms": "7000",
+    "context_aware_eot": "No",
+    "barge_in": "Yes",
+    "barge_behavior": "Cancel in-flight",
+    "backchannel_filtering": "No",
+    "temperature": "0.8",
+    "tts_streaming": "Yes — streaming",
+    "latency_p50_ms": "100",
+    "latency_measured_as": "End-to-end (caller→AI)",
+    "lookup_exists": "Yes",
+    "ani_available": "Yes",
+    "lookup_wired_pre_greeting": "Yes"
+  },
+  "promptVersion": "existing-customer v1",
+  "configLabel": "eot0.8 / temp0.8 / Deepgram VAD",
+  "prompt": "",
+  "transcript": ""
+}
