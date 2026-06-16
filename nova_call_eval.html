@@ -342,12 +342,17 @@ Limit to 6 highest-leverage issues. Be concise.`;
   try{
     const res=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({model:JUDGE_MODEL,max_tokens:1000,temperature:0,messages:[{role:"user",content:sys+"\n\n"+user}]})});
-    const data=await res.json();
+    let data;try{data=await res.json();}catch(_){data=null;}
+    if(!res.ok||!data||data.error||data.type==="error"){
+      const msg=(data&&data.error&&(data.error.message||data.error))||(data&&data.message)||("HTTP "+res.status);
+      resultsEl.innerHTML=`<div class="err"><b>API error</b> — ${esc(String(msg))}<br><span class="mono" style="font-size:11px;color:var(--ink3)">Check: key valid? account has credits/billing? model "${esc(JUDGE_MODEL)}" available on this account?</span></div>`;return;
+    }
     const text=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n");
-    const parsed=JSON.parse(text.replace(/```json|```/g,"").trim());
-    render(parsed,d);
-    logRun(parsed,d);
-  }catch(e){resultsEl.innerHTML=`<div class="err">Evaluation failed to parse. Try again, or shorten the transcript.</div>`;}
+    if(!text.trim()){resultsEl.innerHTML=`<div class="err">Empty model response. Raw: <span class="mono" style="font-size:11px">${esc(JSON.stringify(data).slice(0,400))}</span></div>`;return;}
+    let parsed;try{parsed=JSON.parse(text.replace(/```json|```/g,"").trim());}
+    catch(pe){resultsEl.innerHTML=`<div class="err"><b>Model didn't return clean JSON.</b><br><span class="mono" style="font-size:11px">${esc(text.slice(0,400))}</span></div>`;return;}
+    render(parsed,d);logRun(parsed,d);
+  }catch(e){resultsEl.innerHTML=`<div class="err"><b>Network/proxy error</b> — ${esc(e.message||String(e))}.<br><span class="mono" style="font-size:11px;color:var(--ink3)">If this says "Failed to fetch", the page is calling Anthropic directly (CORS) — confirm the deployed server.js is the Render version that injects /api/eval.</span></div>`;}
   finally{runBtn.disabled=false;runIco.textContent="▶";runTxt.textContent="Run evaluation";}
 };
 
