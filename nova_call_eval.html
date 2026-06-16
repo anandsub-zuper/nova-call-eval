@@ -102,6 +102,11 @@
   .rubric .rr b{color:var(--ink)}
   .foot{margin-top:30px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.25);font-size:10px;color:rgba(255,255,255,0.7)}
   .hidden-file{display:none}
+  .seg-wrap{display:flex;gap:8px;margin-bottom:13px}
+  .seg{font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:8px;background:var(--field);color:var(--ink2);border:1.5px solid var(--line2);flex:1}
+  .seg.on{background:var(--orange);color:#fff;border-color:var(--orange)}
+  .btn-repo{margin-top:13px;width:100%;padding:10px;font-size:13px;font-weight:700;color:#fff;background:var(--orange);border-radius:9px}
+  .btn-repo:hover{background:var(--orange-deep)}
 </style>
 </head>
 <body>
@@ -129,7 +134,20 @@
   <div class="cols">
     <div class="stack-col" id="configCards">
       <!-- config cards injected here -->
-      <div class="card">
+      <div class="card" id="sourceCard" style="display:none">
+        <div class="card-h"><span class="num">0</span><span class="ttl">Source — GitHub-versioned</span><span class="meta" id="srcMeta">loaded from repo</span></div>
+        <div class="seg-wrap">
+          <button class="seg on" data-flow="new-customer">New customer</button>
+          <button class="seg" data-flow="existing-customer">Existing customer</button>
+        </div>
+        <div class="fields">
+          <label class="f"><span class="lbl">Prompt version</span><select id="srcPrompt"></select><span class="hnt">/prompts/&lt;flow&gt;</span></label>
+          <label class="f"><span class="lbl">Knowledge Base (optional)</span><select id="srcKb"></select><span class="hnt">/kb</span></label>
+          <label class="f"><span class="lbl">Config version</span><select id="srcConfig"></select><span class="hnt">/configs</span></label>
+        </div>
+        <button id="loadRepoBtn" class="btn-repo">Load selected from repo</button>
+      </div>
+      <div class="card" id="cardPrompt">
         <div class="card-h"><span class="num">4</span><span class="dot" style="background:var(--prompt)"></span><span class="ttl">Agent prompt</span><span class="meta">behavior only — no KB</span></div>
         <textarea id="prompt" rows="6" placeholder="Paste the deployed system prompt (personality, FSM, guardrails) — keep the Knowledge Base out of here; it has its own box below."></textarea>
       </div>
@@ -241,8 +259,7 @@ Turn-Taking: Do not interrupt. Allow extra time when callers spell or describe p
 
 // ---- build config cards ----
 const cc=document.getElementById("configCards");
-const promptCard=cc.children[0], transcriptCard=cc.children[1];
-GROUPS.slice().reverse().forEach(()=>{}); // noop
+const promptCard=document.getElementById("cardPrompt");
 GROUPS.forEach(g=>{
   const card=document.createElement("div");card.className="card";
   let inner=`<div class="card-h"><span class="num">${g.num}</span><span class="ttl">${g.title}</span><span class="meta">${g.meta}</span></div><div class="fields">`;
@@ -436,7 +453,43 @@ function exportCsv(){
 }
 function q(s){s=String(s||"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
 
-restore();updateTs();renderHist();
+// ---- GitHub-versioned source (served by the Render proxy from the repo) ----
+const hasRepo=!!window.NOVA_HAS_REPO;
+let manifest=null,currentFlow="new-customer";
+async function loadManifest(){
+  if(!hasRepo)return;
+  try{
+    manifest=await (await fetch("/api/manifest")).json();
+    document.getElementById("sourceCard").style.display="block";
+    fillSrc();
+  }catch(e){/* no repo reachable — manual paste/import still works */}
+}
+function fillSrc(){
+  document.querySelectorAll('.seg').forEach(b=>b.classList.toggle('on',b.dataset.flow===currentFlow));
+  const ps=(manifest.prompts&&manifest.prompts[currentFlow])||[];
+  document.getElementById("srcPrompt").innerHTML=ps.length?ps.map(v=>`<option>${v}</option>`).join(""):`<option value="">(none in repo)</option>`;
+  const kbs=manifest.kb||[];
+  document.getElementById("srcKb").innerHTML=`<option value="">None</option>`+kbs.map(v=>`<option>${v}</option>`).join("");
+  const cs=manifest.configs||[];
+  document.getElementById("srcConfig").innerHTML=cs.length?cs.map(v=>`<option>${v}</option>`).join(""):`<option value="">(none)</option>`;
+}
+document.querySelectorAll('.seg').forEach(b=>b.addEventListener("click",()=>{currentFlow=b.dataset.flow;fillSrc();}));
+const loadRepoBtn=document.getElementById("loadRepoBtn");
+if(loadRepoBtn)loadRepoBtn.onclick=async()=>{
+  const pv=document.getElementById("srcPrompt").value;
+  const kv=document.getElementById("srcKb").value;
+  const cv=document.getElementById("srcConfig").value;
+  try{
+    if(pv){promptEl.value=await (await fetch(`/api/file?type=prompt&flow=${encodeURIComponent(currentFlow)}&version=${encodeURIComponent(pv)}`)).text();pvEl.value=`${currentFlow} / ${pv}`;}
+    kbEl.value = kv ? await (await fetch(`/api/file?type=kb&version=${encodeURIComponent(kv)}`)).text() : "";
+    if(cv){const cfg=JSON.parse(await (await fetch(`/api/file?type=config&version=${encodeURIComponent(cv)}`)).text());
+      writeAll({stack:cfg.stack,tune:cfg.tune}); if(cfg.configLabel)clEl.value=cfg.configLabel;}
+    updateTs();save();
+    document.getElementById("srcMeta").textContent=`loaded: ${currentFlow}/${pv||"—"} · kb ${kv||"none"} · cfg ${cv||"—"}`;
+  }catch(e){alert("Could not load from repo: "+(e.message||e));}
+};
+
+restore();updateTs();renderHist();loadManifest();
 </script>
 </body>
 </html>
