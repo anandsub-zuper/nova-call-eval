@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zuper · Nova Call Eval Console</title>
+<style>
+  :root{
+    --bg-dark:#1C0805;--bg-mid:#B23A18;--bg-bright:#E0531F;
+    --orange:#E0531F;--orange-deep:#C0401A;
+    --ink:#241712;--ink2:#5A4942;--ink3:#8A7770;--line2:#E3D2CB;--field:#FBF7F4;--white:#FFFFFF;
+    --prompt:#CC7A1A;--config:#0E9488;--arch:#6D5BD0;--rose:#DC2626;--amber:#D97706;--green:#059669;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--white);
+    font-family:"Manrope",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    background:radial-gradient(130% 100% at 90% 0%,var(--bg-bright) 0%,var(--bg-mid) 42%,var(--bg-dark) 100%);background-attachment:fixed;}
+  .wrap{max-width:1240px;margin:0 auto;padding:26px 20px 48px}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+  .head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:22px}
+  .brandrow{display:flex;align-items:center;gap:12px}
+  .logo{height:40px;width:40px;border-radius:11px;display:grid;place-items:center;background:var(--white);color:var(--orange);font-weight:800;font-size:20px}
+  .wordmark{font-weight:800;font-size:21px;letter-spacing:-.01em;color:var(--white)}
+  .tag{font-size:10px;font-weight:700;letter-spacing:.05em;padding:3px 8px;border-radius:5px;background:rgba(255,255,255,0.22);color:var(--white)}
+  .sub{font-size:11.5px;color:rgba(255,255,255,0.82);margin-top:3px}
+  .btns{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:9px;transition:.15s;font-weight:600}
+  .btn-ghost{font-size:12px;padding:9px 13px;background:rgba(255,255,255,0.12);color:var(--white);border:1px solid rgba(255,255,255,0.4)}
+  .btn-ghost:hover{background:rgba(255,255,255,0.22)}
+  .btn-primary{font-size:14px;font-weight:800;padding:11px 20px;background:var(--white);color:var(--orange-deep);display:flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+  .btn-primary:hover{transform:translateY(-1px)}
+  .btn-primary:disabled{opacity:.6;cursor:default;transform:none}
+  .cols{display:grid;grid-template-columns:1fr;gap:18px}
+  @media(min-width:1000px){.cols{grid-template-columns:1fr 1fr}}
+  .stack-col{display:flex;flex-direction:column;gap:18px}
+  .card{background:var(--white);border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(40,10,0,.18);color:var(--ink)}
+  .card-h{display:flex;align-items:center;gap:9px;margin-bottom:15px}
+  .card-h .ttl{font-size:14px;font-weight:800;color:var(--ink)}
+  .card-h .meta{margin-left:auto;font-size:10px;color:var(--ink3)}
+  .num{height:23px;width:23px;border-radius:7px;display:grid;place-items:center;font-size:12px;font-weight:800;background:var(--orange);color:var(--white)}
+  .dot{height:9px;width:9px;border-radius:50%}
+  .fields{display:grid;grid-template-columns:1fr;gap:13px}
+  @media(min-width:560px){.fields{grid-template-columns:1fr 1fr}}
+  label.f{display:block}
+  label.f .lbl{font-size:11.5px;color:var(--ink);font-weight:700}
+  label.f .hnt{font-size:10px;color:var(--ink3)}
+  input,textarea,select{width:100%;margin-top:5px;background:var(--field);border:1.5px solid var(--line2);color:var(--ink);
+    border-radius:8px;padding:9px 11px;font-size:13px;outline:none;font-family:ui-monospace,monospace}
+  select{appearance:none;-webkit-appearance:none;cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23C0401A' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
+  input:focus,textarea:focus,select:focus{border-color:var(--orange);background:var(--white)}
+  input::placeholder,textarea::placeholder{color:var(--ink3)}
+  textarea{line-height:1.55;resize:vertical;font-size:12.5px}
+  .ts{margin-left:auto;font-size:10px;padding:3px 8px;border-radius:5px;font-weight:700}
+  .ts.ok{background:rgba(5,150,105,0.12);color:var(--green)}
+  .ts.no{background:rgba(220,38,38,0.1);color:var(--rose)}
+  .savenote{font-size:10.5px;color:var(--ink3);margin-top:12px;display:flex;align-items:center;gap:6px}
+  .savenote b{color:var(--green);font-weight:700}
+  .metarow{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:13px}
+  .empty{background:var(--white);border-radius:16px;padding:46px 22px;text-align:center;box-shadow:0 10px 30px rgba(40,10,0,.18)}
+  .empty .ico{font-size:28px;color:var(--orange)}
+  .empty p{margin:7px auto;color:var(--ink2);font-size:13px;max-width:340px}
+  .err{background:var(--white);border-left:4px solid var(--rose);color:var(--ink);font-size:13px;padding:13px 16px;border-radius:10px;box-shadow:0 10px 30px rgba(40,10,0,.18)}
+  .lanes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .lane{border-radius:12px;padding:13px;border:1.5px solid}
+  .lane .n{font-size:28px;font-weight:800;line-height:1}
+  .lane .l{font-size:12px;margin-top:4px;color:var(--ink);font-weight:700}
+  .lane .w{font-size:10px;color:var(--ink3)}
+  .ov{font-size:12px;color:var(--ink2)}
+  .ov b{font-size:23px;font-weight:800;color:var(--orange-deep)}
+  .score-row{display:flex;align-items:center;gap:12px;margin-bottom:11px}
+  .score-row .sl{font-size:12px;color:var(--ink2);width:118px;font-weight:600}
+  .bar{flex:1;height:7px;border-radius:99px;background:#F0E7E2;overflow:hidden}
+  .bar>span{display:block;height:100%}
+  .sv{font-size:12px;width:36px;text-align:right;color:var(--ink2);font-weight:700}
+  .issue{border-radius:14px;padding:16px;background:var(--white);border-left:4px solid;box-shadow:0 8px 24px rgba(40,10,0,.14)}
+  .itop{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px}
+  .pill{font-size:10px;font-weight:800;padding:3px 9px;border-radius:6px;white-space:nowrap}
+  .ititle{font-size:14px;font-weight:700;flex:1;color:var(--ink)}
+  .ev{font-size:11.5px;color:var(--ink2);padding:9px 11px;border-radius:8px;background:var(--field);margin-bottom:10px;border-left:3px solid}
+  .fix{font-size:13.5px;color:var(--ink);line-height:1.55}
+  .fix .k{color:var(--orange-deep);font-weight:700}
+  .summary{display:flex;gap:10px;font-size:13.5px;line-height:1.55;color:var(--ink);align-items:flex-start}
+  .summary .ic{color:var(--orange);font-size:16px}
+  .reslabel{font-size:11px;color:var(--ink3);margin-bottom:7px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+  /* history */
+  .hist{margin-top:18px}
+  .hcard{background:var(--white);border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(40,10,0,.18);color:var(--ink)}
+  .htbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+  .htbl th{text-align:left;color:var(--ink3);font-weight:700;padding:6px 8px;border-bottom:1.5px solid var(--line2);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
+  .htbl td{padding:7px 8px;border-bottom:1px solid #F2E8E3;color:var(--ink)}
+  .htbl tr:last-child td{border-bottom:none}
+  .chip{font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:#F2E8E3;color:var(--ink2)}
+  .trend{display:flex;align-items:flex-end;gap:3px;height:34px}
+  .trend span{width:8px;border-radius:2px 2px 0 0;background:var(--orange);opacity:.85}
+  /* rubric */
+  .rubric{background:var(--white);border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(40,10,0,.18);color:var(--ink);margin-bottom:18px;display:none}
+  .rubric h4{margin:0 0 4px;font-size:13px;color:var(--ink)}
+  .rubric .rr{padding:9px 0;border-bottom:1px solid #F2E8E3;font-size:12px;color:var(--ink2);line-height:1.5}
+  .rubric .rr:last-child{border-bottom:none}
+  .rubric .rr b{color:var(--ink)}
+  .foot{margin-top:30px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.25);font-size:10px;color:rgba(255,255,255,0.7)}
+  .hidden-file{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="brandrow">
+      <div class="logo">Z</div>
+      <div>
+        <div style="display:flex;align-items:center;gap:8px"><span class="wordmark">Zuper</span><span class="tag">Z-002 · NOVA</span></div>
+        <div class="sub">Call Eval Console — stack + config + transcript → attributed, repeatable diagnosis</div>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn-ghost" id="rubricBtn">Rubric</button>
+      <button class="btn-ghost" id="exportBtn">Export config</button>
+      <button class="btn-ghost" id="importBtn">Import config</button>
+      <input type="file" id="importFile" class="hidden-file" accept="application/json"/>
+      <button class="btn-ghost" id="loadSample">Load sample</button>
+      <button class="btn-primary" id="runBtn"><span id="runIco">▶</span><span id="runTxt">Run evaluation</span></button>
+    </div>
+  </div>
+
+  <div class="rubric" id="rubricPanel"></div>
+
+  <div class="cols">
+    <div class="stack-col" id="configCards">
+      <!-- config cards injected here -->
+      <div class="card">
+        <div class="card-h"><span class="num">4</span><span class="dot" style="background:var(--prompt)"></span><span class="ttl">Agent prompt</span></div>
+        <textarea id="prompt" rows="6" placeholder="Paste the deployed system prompt for this call flow…"></textarea>
+      </div>
+      <div class="card">
+        <div class="card-h"><span class="num">5</span><span class="dot" style="background:var(--arch)"></span><span class="ttl">Call transcript</span><span class="ts" id="tsBadge" style="display:none"></span></div>
+        <textarea id="transcript" rows="8" placeholder="Paste the RAW diarized, timestamped output from your STT (not a cleaned transcript — cleaning hides the overlaps). Keep speaker labels + [m:ss] timestamps."></textarea>
+        <div class="savenote">Tip: raw ASR output preserves who-spoke-when, including talk-overs — that's what reveals turn-taking issues.</div>
+        <div class="metarow">
+          <label class="f"><span class="lbl">Prompt version</span><input id="pv" placeholder="e.g. existing-cust v12"/><span class="hnt">Tagged on every run</span></label>
+          <label class="f"><span class="lbl">Config label</span><input id="cl" placeholder="e.g. eot0.8 / temp0.3"/><span class="hnt">Tagged on every run</span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="stack-col" id="results">
+      <div class="empty" id="emptyState">
+        <div class="ico">◎</div>
+        <p>Fill the stack &amp; config once, paste a call, then run.</p>
+        <p style="font-size:11px;color:var(--ink3)">Every issue is tagged <span style="color:var(--prompt);font-weight:700">Prompt</span>, <span style="color:var(--config);font-weight:700">Config</span>, or <span style="color:var(--arch);font-weight:700">Architecture</span> so it routes to the right owner.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="hist" id="histWrap"></div>
+
+  <div class="foot mono">Zuper · AI Operating System for the Trades — internal Nova diagnostics · north star: conversational, empathetic, human, never interrupts</div>
+</div>
+
+<script>
+const ENDPOINT=(window.NOVA_EVAL_ENDPOINT)||"https://api.anthropic.com/v1/messages";
+const JUDGE_MODEL=(window.NOVA_JUDGE_MODEL)||"claude-sonnet-4-6";
+const LS_KEY="zuper_nova_eval_v5", HKEY="zuper_nova_runs_v1";
+const LANES={Prompt:{raw:"#CC7A1A",who:"Prompt team"},Config:{raw:"#0E9488",who:"Voice infra"},Architecture:{raw:"#6D5BD0",who:"Product / Eng"}};
+const SEV={high:"#DC2626",medium:"#D97706",low:"#64748B"};
+
+const GROUPS=[
+ {id:"g_stack",num:1,title:"Stack architecture",meta:"who owns each layer",bucket:"stack",fields:[
+   {key:"stt",label:"Speech-to-text (STT)",type:"select",opts:["Deepgram","AssemblyAI","Whisper (OpenAI)","Google STT","Azure STT","Other"],hint:"Often owns turn detection"},
+   {key:"stt_model",label:"STT model",type:"text",ph:"e.g. nova-2-phonecall",hint:"Telephony-optimized model matters"},
+   {key:"tts",label:"Text-to-speech (TTS)",type:"select",opts:["Cartesia","ElevenLabs","PlayHT","OpenAI TTS","Azure TTS","Rime","Other"],hint:"Naturalness + latency"},
+   {key:"orchestration",label:"Orchestration",type:"select",opts:["LiveKit Agents","Pipecat","Vapi","Retell","Bland","Custom orchestrator","Other"],hint:"Owns turn-taking glue"},
+   {key:"llm",label:"LLM",type:"select",opts:["GPT-4o","GPT-4o-mini","GPT-4.1","GPT Realtime","Claude","Other"],hint:"Reasoning + entity handling"},
+   {key:"realtime_mode",label:"If realtime: mode",type:"select",opts:["—","N/A — text LLM","Speech-to-speech","Text in/out (external STT+TTS)","Unsure"],hint:"Realtime VAD can clash w/ STT EOT"},
+   {key:"telephony",label:"Telephony",type:"select",opts:["Twilio","Telnyx","Vonage","Plivo","SIP / Other","Unsure"],hint:"Carrier / media path"},
+   {key:"audio_codec",label:"Audio codec / rate",type:"text",ph:"e.g. 8kHz μ-law (PCMU)",hint:"Narrowband degrades STT on spelled names"},
+ ]},
+ {id:"g_turn",num:2,title:"Turn detection & barge-in",meta:"the interruption levers",bucket:"tune",fields:[
+   {key:"turn_detection_owner",label:"Turn-taking owned by",type:"select",opts:["—","Deepgram EOT","Realtime server VAD","Both (possible conflict)","Custom orchestrator","Unsure"],hint:"Must be exactly ONE system"},
+   {key:"eot",label:"EOT threshold",type:"number",ph:"e.g. 0.8",hint:"0–1; higher = more patient, fewer interrupts"},
+   {key:"eot_timeout_ms",label:"EOT timeout (ms)",type:"number",ph:"e.g. 7000",hint:"Forces turn end even if threshold unmet"},
+   {key:"context_aware_eot",label:"Context-aware EOT?",type:"select",opts:["—","Yes","No","Unsure"],hint:"Higher threshold during spelling/address"},
+   {key:"barge_in",label:"Barge-in enabled?",type:"select",opts:["—","Yes","No","Unsure"],hint:"Caller can cut off the AI"},
+   {key:"barge_behavior",label:"On barge-in",type:"select",opts:["—","Cancel in-flight","Finish utterance","N/A","Unsure"],hint:"Finish → talk-over fragments"},
+   {key:"backchannel_filtering",label:"Backchannel filtering?",type:"select",opts:["—","Yes","No","Unsure"],hint:"Ignore 'okay/mm-hm' so they don't cut off AI"},
+ ]},
+ {id:"g_sys",num:3,title:"LLM, latency & capabilities",meta:"reliability + experience",bucket:"tune",fields:[
+   {key:"temperature",label:"LLM temperature",type:"number",ph:"e.g. 0.3",hint:"High (>0.5) → unstable spelling/confirmations"},
+   {key:"tts_streaming",label:"TTS streaming?",type:"select",opts:["—","Yes — streaming","No — full response","Unsure"],hint:"No → big audible delay"},
+   {key:"latency_p50_ms",label:"Latency p50 (ms)",type:"number",ph:"e.g. 800",hint:"Caller stops → AI speaks"},
+   {key:"latency_measured_as",label:"Latency measured as",type:"select",opts:["—","End-to-end (caller→AI)","TTS first byte","LLM first token","Unsure"],hint:"100ms is usually ONE component, not the loop"},
+   {key:"lookup_exists",label:"lookup_customer exists?",type:"select",opts:["—","Yes","No","Unsure"],hint:"Account-search capability"},
+   {key:"ani_available",label:"ANI available at start?",type:"select",opts:["—","Yes","No","Unsure"],hint:"Enables silent lookup"},
+   {key:"lookup_wired_pre_greeting",label:"Lookup fires before greeting?",type:"select",opts:["—","Yes","No","Unsure"],hint:"If No, existing callers feel like strangers"},
+ ]},
+];
+
+const SCORE_KEYS=[["turn_management","No interrupting"],["confirmation","Confirmation"],["entity_capture","Entity capture"],["empathy","Empathy"],["naturalness","Human-like"],["task_completion","Task done"]];
+
+const RUBRIC={
+ intro:"Anchored 0–10 scale, scored deterministically (judge temp 0). Same call should score the same on re-run.",
+ bands:"9–10 indistinguishable from a great human CSR · 7–8 good, minor issues · 4–6 noticeable problems hurting experience · 0–3 severe failure",
+ dims:[
+  ["No interrupting","Agent never speaks over the caller; waits through pauses while spelling/recalling. Overlapping timestamps or chopped utterances drop this hard."],
+  ["Confirmation","Confirms consequential fields once; no reconfirm loops; doesn't re-ask verified info."],
+  ["Entity capture","Spelled letters treated as ground truth; names/emails/addresses captured right; no re-derived spellings; handles last-name-first."],
+  ["Empathy","Acknowledges leaks/damage/urgency before admin; reads severity correctly (interior water ≠ 'small')."],
+  ["Human-like","Varied acknowledgements; natural transitions; not templated/robotic; right pace."],
+  ["Task done","Correct outcome (right customer, right booking, no duplicate profile), call closed cleanly."],
+ ]
+};
+
+const SAMPLE={
+ stack:{stt:"Deepgram",stt_model:"nova-2-phonecall",tts:"Cartesia",orchestration:"Custom orchestrator",llm:"gpt-realtime-1.5",realtime_mode:"Text in/out (external STT+TTS)",telephony:"Plivo",audio_codec:"8kHz μ-law (PCMU)"},
+ tune:{turn_detection_owner:"Deepgram EOT",eot:"0.8",eot_timeout_ms:"7000",context_aware_eot:"No",barge_in:"Yes",barge_behavior:"Cancel in-flight",backchannel_filtering:"No",temperature:"0.8",tts_streaming:"Yes — streaming",latency_p50_ms:"100",latency_measured_as:"End-to-end (caller→AI)",lookup_exists:"Yes",ani_available:"Yes",lookup_wired_pre_greeting:"Yes"},
+ promptVersion:"existing-cust v-sample",configLabel:"eot0.8 / temp0.8 / Deepgram VAD",
+ prompt:`# Personality and Tone
+Identity: A warm, patient voice agent for A&A Roofing.
+Confirmation Style: Confirm critical details once. If a caller spells a name/email/address, treat the spelling as source of truth.
+Turn-Taking: Do not interrupt. Allow extra time when callers spell or describe problems.
+(Existing-customer flow. ANI lookup runs before the stream connects; this caller likely called from a number not on file, so was initialized as new-customer.)`,
+ transcript:`[0:02] A: Hello and welcome to A&A Roofing. How can I help you today?
+[0:08] B: Yes, my name is Mark Paulson. You put a new roof on my house about 5 years ago, and I've got a small leak near a chimney.
+[0:24] A: Thanks for reaching out, Mark. To get someone out there, I'll set up your profile first.
+[0:34] B: Okay. (caller still speaking) A: [0:34] Thanks, Mark. And you're— Great. Thanks for confirming.
+[0:51] B: It's Paulsen, P-A-U-L-S-E-N, Mark, M-A-R-K, 841@gmail.com.
+[1:10] A: I've got Mark Paulson. ... [1:54] Paulson spelled P-A-U-L-S-O-N ... [1:55] Mark Paulson spelled P-A-U-L-S-E-N
+[2:13] A: Great. Thank you, Mark Paulson. Now let's move on to the phone number.
+[2:45] A: That's 769 Claremont Drive, Richland, Washington 99352. (ZIP not clearly stated by caller before agent said it)
+[2:56] A: I'll create your profile now. This will just take a moment. All set, Mark.
+[3:10] A: Thanks for confirming. (caller answers "Homeowner" at 3:21 — answered before asked)
+[3:26] B: A little bit of water is running down the inside wall down to the floor on the second story.
+[3:47] A: Thanks for the detail. That helps a lot. When would be a good time to come out?
+[4:20] A: All set. Your inspection is scheduled for tomorrow at 9:00 AM.`
+};
+
+// ---- build config cards ----
+const cc=document.getElementById("configCards");
+const promptCard=cc.children[0], transcriptCard=cc.children[1];
+GROUPS.slice().reverse().forEach(()=>{}); // noop
+GROUPS.forEach(g=>{
+  const card=document.createElement("div");card.className="card";
+  let inner=`<div class="card-h"><span class="num">${g.num}</span><span class="ttl">${g.title}</span><span class="meta">${g.meta}</span></div><div class="fields">`;
+  g.fields.forEach(f=>{
+    let ctrl;
+    if(f.type==="select"){
+      ctrl=`<select data-key="${f.key}">`+(f.opts[0]==="—"?"":`<option value="">—</option>`)+
+        f.opts.map(o=>`<option value="${o==="—"?"":o}">${o}</option>`).join("")+`</select>`;
+    } else { ctrl=`<input data-key="${f.key}" placeholder="${f.ph||""}"/>`; }
+    inner+=`<label class="f"><span class="lbl">${f.label}</span>${ctrl}<span class="hnt">${f.hint||""}</span></label>`;
+  });
+  inner+=`</div>`;card.innerHTML=inner;
+  cc.insertBefore(card,promptCard);
+});
+
+const promptEl=document.getElementById("prompt"),transEl=document.getElementById("transcript"),tsBadge=document.getElementById("tsBadge");
+const pvEl=document.getElementById("pv"),clEl=document.getElementById("cl");
+
+function setVal(el,val){
+  if(el.tagName==="SELECT"&&val&&![...el.options].some(o=>o.value===val)){
+    const o=document.createElement("option");o.value=val;o.textContent=val;el.appendChild(o);
+  }
+  el.value=val;
+}
+function readAll(){
+  const o={stack:{},tune:{},prompt:promptEl.value,transcript:transEl.value,promptVersion:pvEl.value,configLabel:clEl.value};
+  GROUPS.forEach(g=>g.fields.forEach(f=>{const el=document.querySelector(`[data-key="${f.key}"]`);o[g.bucket][f.key]=el?el.value:"";}));
+  return o;
+}
+function writeAll(d){
+  if(!d)return;
+  GROUPS.forEach(g=>g.fields.forEach(f=>{const el=document.querySelector(`[data-key="${f.key}"]`);if(el&&d[g.bucket]&&d[g.bucket][f.key]!=null)setVal(el,d[g.bucket][f.key]);}));
+  if(d.prompt!=null)promptEl.value=d.prompt;
+  if(d.transcript!=null)transEl.value=d.transcript;
+  if(d.promptVersion!=null)pvEl.value=d.promptVersion;
+  if(d.configLabel!=null)clEl.value=d.configLabel;
+  updateTs();
+}
+function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(readAll()));}catch(e){}}
+function restore(){try{const r=localStorage.getItem(LS_KEY);if(r)writeAll(JSON.parse(r));}catch(e){}}
+document.addEventListener("input",e=>{if(e.target.matches('[data-key],#prompt,#transcript,#pv,#cl'))save();});
+document.addEventListener("change",e=>{if(e.target.matches('[data-key]'))save();});
+
+function updateTs(){const t=transEl.value;if(!t){tsBadge.style.display="none";return;}
+  const has=/\[\d+:\d{2}\]|\d+:\d{2}/.test(t);tsBadge.style.display="inline-block";
+  tsBadge.className="ts "+(has?"ok":"no");tsBadge.textContent=has?"timestamps detected ✓":"no timestamps — turn-taking can't be judged";}
+transEl.addEventListener("input",updateTs);
+
+document.getElementById("loadSample").onclick=()=>{writeAll(SAMPLE);save();document.getElementById("results").innerHTML=emptyHTML();};
+document.getElementById("exportBtn").onclick=()=>{const blob=new Blob([JSON.stringify(readAll(),null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="nova-eval-config.json";a.click();URL.revokeObjectURL(a.href);};
+document.getElementById("importBtn").onclick=()=>document.getElementById("importFile").click();
+document.getElementById("importFile").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{writeAll(JSON.parse(r.result));save();}catch(err){alert("Could not read that config file.");}};r.readAsText(f);};
+
+// rubric panel
+const rubricPanel=document.getElementById("rubricPanel");
+rubricPanel.innerHTML=`<div class="card-h" style="margin-bottom:8px"><span class="ttl">Scoring rubric</span><span class="meta">${RUBRIC.intro}</span></div>
+  <div class="rr"><b>Bands:</b> ${RUBRIC.bands}</div>`+
+  RUBRIC.dims.map(d=>`<div class="rr"><b>${d[0]}.</b> ${d[1]}</div>`).join("");
+document.getElementById("rubricBtn").onclick=()=>{rubricPanel.style.display=rubricPanel.style.display==="block"?"none":"block";};
+
+function emptyHTML(){return `<div class="empty"><div class="ico">◎</div>
+  <p>Fill the stack &amp; config once, paste a call, then run.</p>
+  <p style="font-size:11px;color:var(--ink3)">Every issue is tagged <span style="color:var(--prompt);font-weight:700">Prompt</span>, <span style="color:var(--config);font-weight:700">Config</span>, or <span style="color:var(--arch);font-weight:700">Architecture</span> so it routes to the right owner.</p></div>`;}
+
+const runBtn=document.getElementById("runBtn"),runIco=document.getElementById("runIco"),runTxt=document.getElementById("runTxt"),resultsEl=document.getElementById("results");
+
+runBtn.onclick=async()=>{
+  const d=readAll();const transcript=d.transcript.trim();
+  if(!transcript){resultsEl.innerHTML=`<div class="err">Paste a call transcript first.</div>`;return;}
+  runBtn.disabled=true;runIco.textContent="⏳";runTxt.textContent="Evaluating…";resultsEl.innerHTML="";
+  const stackText=GROUPS[0].fields.map(f=>`${f.label}: ${d.stack[f.key]||"(not set)"}`).join("\n");
+  const tuneText=GROUPS.slice(1).flatMap(g=>g.fields).map(f=>`${f.label}: ${d.tune[f.key]||"(not set)"}`).join("\n");
+  const rubricText=`SCORING RUBRIC (anchored, be consistent):\nBands: ${RUBRIC.bands}\n`+RUBRIC.dims.map(x=>`- ${x[0]}: ${x[1]}`).join("\n");
+  const sys=`You are the lead voice-AI evaluator for Zuper's Nova CSR Agent — inbound calls for roofing/trades contractors. North star: a CSR that is genuinely conversational, speaks with empathy, sounds human, never interrupts, and gives the best experience in the market. Hold every call to that bar and score deterministically against the rubric.
+
+You receive the STACK, the TUNING values, the agent PROMPT, and a call TRANSCRIPT. Evaluate the transcript against all of them.
+
+${rubricText}
+
+For EVERY issue, assign an owner:
+- "Prompt": fixable by editing instructions (over-confirmation, robotic/repeated phrasing, missing empathy, weak entity rules, name-order confusion, lookup not invoked before greeting even though it exists).
+- "Config": caused by a tuning value; name the SPECIFIC value + target. The stack uses Deepgram turn detection (VAD + semantic EOT): 'eot' = end-of-turn confidence threshold (higher = more patient, fewer interrupts, more latency); 'eot_timeout_ms' forces a turn end if threshold never met. Overlap while spelling/pausing usually = EOT fired too eagerly → raise eot and/or context-aware EOT.
+- "Architecture": a genuinely MISSING capability.
+
+ARCHITECTURE NOTES (apply when relevant):
+- Realtime LLM (GPT Realtime) + Deepgram EOT + custom orchestrator → watch for TWO turn-detection systems conflicting (realtime server VAD vs Deepgram EOT). If 'Turn-taking owned by' is "Both" or "Unsure", flag as likely top cause; recommend one owner, disable the other. Attribute to custom orchestrator.
+- If latency p50 is low or 'measured as' is a single component (not end-to-end), do NOT blame robotic feel on latency.
+- High temperature (>0.5) on structured intake → flag: unstable spellings, inconsistent confirmations, off-script risk; recommend 0.2–0.4.
+- barge-in on + cancel-in-flight: if acknowledgment words ("okay", "yeah", "right", "that's right") are treated as barge-in, that is a HIGH issue — the agent gets cancelled mid-utterance on natural backchannel (e.g. "And you're— Great"). Recommend distinguishing backchannel from real barge-in (ignore short standalone acknowledgments unless followed by more speech), NOT disabling barge-in or only tuning EOT.
+- lookup_customer EXISTS + ANI available + lookup runs before greeting, yet an existing caller was initialized as new: most likely the caller used a number not on file. Recommend a PROMPT-side fallback — when a caller self-identifies as existing ("you did my roof") but was initialized as new, offer to look them up by name/address instead of silently creating a duplicate. Prompt issue, not Architecture.
+- Narrowband telephony codec (8kHz μ-law) degrades STT on spelled names — note when entity errors appear.
+
+Use timestamps as evidence for turn-taking. If NO timestamps, state turn-taking cannot be assessed; do NOT invent overlap. Make fixes concrete and improvement-oriented.
+
+Return ONLY valid JSON, no markdown, no preamble:
+{"scorecard":{"turn_management":0,"confirmation":0,"entity_capture":0,"empathy":0,"naturalness":0,"task_completion":0,"overall":0},"issues":[{"title":"short","owner":"Prompt|Config|Architecture","severity":"high|medium|low","evidence":"quote/timestamp","fix":"specific; name provider/value"}],"summary":"2 sentences naming the single highest-leverage fix"}
+Limit to 6 highest-leverage issues. Be concise.`;
+  const user=`=== STACK ===\n${stackText}\n\n=== TUNING ===\n${tuneText}\n\n=== AGENT PROMPT ===\n${d.prompt||"(none provided)"}\n\n=== TRANSCRIPT ===\n${transcript}`;
+  try{
+    const res=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:JUDGE_MODEL,max_tokens:1000,temperature:0,messages:[{role:"user",content:sys+"\n\n"+user}]})});
+    const data=await res.json();
+    const text=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n");
+    const parsed=JSON.parse(text.replace(/```json|```/g,"").trim());
+    render(parsed,d);
+    logRun(parsed,d);
+  }catch(e){resultsEl.innerHTML=`<div class="err">Evaluation failed to parse. Try again, or shorten the transcript.</div>`;}
+  finally{runBtn.disabled=false;runIco.textContent="▶";runTxt.textContent="Run evaluation";}
+};
+
+function render(r,d){
+  const counts=Object.keys(LANES).map(k=>[k,(r.issues||[]).filter(i=>i.owner===k).length]);
+  let html=`<div class="reslabel">Result · ${d.promptVersion||"untagged"} · ${d.configLabel||"untagged"}</div>`;
+  html+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+    <span class="ttl" style="font-size:14px;font-weight:800">Where the fixes go</span>
+    <span class="ov">Overall <b>${r.scorecard.overall}</b>/10</span></div><div class="lanes">`;
+  counts.forEach(([k,n])=>{const L=LANES[k];
+    html+=`<div class="lane" style="background:${L.raw}14;border-color:${L.raw}55">
+      <div class="n" style="color:${L.raw}">${n}</div><div class="l">${k}</div><div class="w">→ ${L.who}</div></div>`;});
+  html+=`</div></div>`;
+  html+=`<div class="card"><span class="ttl" style="font-size:14px;font-weight:800">Scorecard</span><div style="margin-top:13px">`;
+  SCORE_KEYS.forEach(([k,label])=>{const v=r.scorecard[k]??0;const c=v>=8?"#059669":v>=6?"#D97706":"#DC2626";
+    html+=`<div class="score-row"><span class="sl">${label}</span><div class="bar"><span style="width:${v*10}%;background:${c}"></span></div><span class="sv">${v}/10</span></div>`;});
+  html+=`</div></div>`;
+  (r.issues||[]).forEach(iss=>{const L=LANES[iss.owner]||LANES.Prompt;const sc=SEV[iss.severity]||SEV.low;
+    html+=`<div class="issue" style="border-left-color:${L.raw}">
+      <div class="itop"><span class="pill" style="background:${L.raw}1f;color:${L.raw}">${iss.owner}</span>
+        <span class="pill" style="color:${sc};background:${sc}18">${iss.severity}</span>
+        <span class="ititle">${esc(iss.title)}</span></div>
+      ${iss.evidence?`<div class="ev mono" style="border-left-color:${L.raw}">${esc(iss.evidence)}</div>`:""}
+      <div class="fix"><span class="k">Fix → </span>${esc(iss.fix)}</div></div>`;});
+  if(r.summary)html+=`<div class="card summary"><span class="ic">⚠</span><span>${esc(r.summary)}</span></div>`;
+  html+=`<button class="btn-ghost" id="dlRun" style="color:var(--orange-deep);background:#F7EDE7;border:1px solid var(--line2);width:100%;padding:10px">Download this result (JSON)</button>`;
+  resultsEl.innerHTML=html;
+  document.getElementById("dlRun").onclick=()=>{const blob=new Blob([JSON.stringify({meta:{promptVersion:d.promptVersion,configLabel:d.configLabel,ts:new Date().toISOString()},stack:d.stack,tune:d.tune,result:r},null,2)],{type:"application/json"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="nova-eval-result.json";a.click();URL.revokeObjectURL(a.href);};
+}
+function esc(s){return String(s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+
+// ---- run history ----
+function getRuns(){try{return JSON.parse(localStorage.getItem(HKEY))||[]}catch(e){return[]}}
+function logRun(r,d){
+  const runs=getRuns();
+  runs.push({ts:new Date().toISOString(),pv:d.promptVersion||"untagged",cl:d.configLabel||"untagged",
+    overall:r.scorecard.overall,sc:r.scorecard,
+    counts:Object.fromEntries(Object.keys(LANES).map(k=>[k,(r.issues||[]).filter(i=>i.owner===k).length]))});
+  try{localStorage.setItem(HKEY,JSON.stringify(runs.slice(-100)))}catch(e){}
+  renderHist();
+}
+function renderHist(){
+  const runs=getRuns();const w=document.getElementById("histWrap");
+  if(!runs.length){w.innerHTML="";return;}
+  const recent=runs.slice(-12);
+  const trend=recent.map(r=>`<span title="${r.overall}/10" style="height:${Math.max(6,r.overall*3.2)}px"></span>`).join("");
+  let rows=runs.slice(-10).reverse().map(r=>`<tr>
+    <td class="mono">${new Date(r.ts).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
+    <td><span class="chip">${esc(r.pv)}</span></td><td><span class="chip">${esc(r.cl)}</span></td>
+    <td style="font-weight:800;color:var(--orange-deep)">${r.overall}/10</td>
+    <td><span style="color:var(--prompt);font-weight:700">${r.counts.Prompt||0}</span> / <span style="color:var(--config);font-weight:700">${r.counts.Config||0}</span> / <span style="color:var(--arch);font-weight:700">${r.counts.Architecture||0}</span></td>
+  </tr>`).join("");
+  w.innerHTML=`<div class="hcard">
+    <div class="card-h"><span class="ttl">Run history</span><span class="meta">${runs.length} runs · overall-score trend</span>
+      <div style="display:flex;gap:8px;margin-left:12px">
+        <button class="btn-ghost" id="csvBtn" style="color:var(--orange-deep);background:#F7EDE7;border:1px solid var(--line2)">Export CSV</button>
+        <button class="btn-ghost" id="clrBtn" style="color:var(--rose);background:#FBEDED;border:1px solid #F2D5D5">Clear</button>
+      </div></div>
+    <div class="trend">${trend}</div>
+    <table class="htbl"><thead><tr><th>When</th><th>Prompt</th><th>Config</th><th>Overall</th><th>P / C / A</th></tr></thead><tbody>${rows}</tbody></table>
+  </div>`;
+  document.getElementById("csvBtn").onclick=exportCsv;
+  document.getElementById("clrBtn").onclick=()=>{if(confirm("Clear all saved runs?")){localStorage.removeItem(HKEY);renderHist();}};
+}
+function exportCsv(){
+  const runs=getRuns();const head=["ts","prompt_version","config_label","overall","turn_management","confirmation","entity_capture","empathy","naturalness","task_completion","prompt_issues","config_issues","arch_issues"];
+  const lines=[head.join(",")].concat(runs.map(r=>[r.ts,q(r.pv),q(r.cl),r.overall,r.sc.turn_management,r.sc.confirmation,r.sc.entity_capture,r.sc.empathy,r.sc.naturalness,r.sc.task_completion,r.counts.Prompt||0,r.counts.Config||0,r.counts.Architecture||0].join(",")));
+  const blob=new Blob([lines.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="nova-eval-history.csv";a.click();URL.revokeObjectURL(a.href);
+}
+function q(s){s=String(s||"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+
+restore();updateTs();renderHist();
+</script>
+</body>
+</html>

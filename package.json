@@ -1,0 +1,9 @@
+{
+  "name": "nova-call-eval",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Zuper Nova CSR Agent call evaluation console + Anthropic proxy",
+  "engines": { "node": ">=18" },
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "express": "^4.19.2" }
+}
