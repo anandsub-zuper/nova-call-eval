@@ -348,6 +348,12 @@ For EVERY issue, assign an owner:
 - "Config": caused by a tuning value; name the SPECIFIC value + target. The stack uses Deepgram turn detection (VAD + semantic EOT): 'eot' = end-of-turn confidence threshold (higher = more patient, fewer interrupts, more latency); 'eot_timeout_ms' forces a turn end if threshold never met. Overlap while spelling/pausing usually = EOT fired too eagerly → raise eot and/or context-aware EOT.
 - "Architecture": a genuinely MISSING capability.
 
+ARCHITECTURE THE JUDGE MUST ASSUME (do NOT penalize these — they are invisible in a transcript by design):
+- FUNCTION CALLS execute OUTSIDE the transcript. create_customer_profile, scheduling/booking, reschedule, and similar tool calls will NEVER appear in the transcript. Their absence is EXPECTED and is NOT evidence of failure. NEVER report "no function call", "fabricated booking", "ungrounded confirmation", or "no record created" — you cannot see function calls and must assume they fired when the agent's words imply they did.
+- NEW-vs-EXISTING ROUTING is decided UPSTREAM by an ANI (caller-ID) lookup BEFORE the prompt runs. The agent is already placed in the correct flow. If the agent greets a caller by name or references an address/job already on file, that is the CORRECT existing-customer path — do NOT flag it as "wrong FSM", "skipped onboarding", "treated new caller as existing", or "improvised an undefined flow". Only flag routing if the transcript shows a clear self-identified existing customer who is being made to create a brand-new profile from scratch.
+- BOOKING/JOB CONFIRMATION is handled by a DOWNSTREAM system. A verbal confirmation ("you're booked for 5 PM", "you'll get a confirmation text") is VALID and is NOT a fabrication. Do NOT require a visible scheduling call before the agent confirms.
+- Judge ONLY what is observable in the transcript: turn-taking/overlap (timestamps), what the agent SAID, entity capture and read-backs, empathy, confirmation behavior, conversational quality, and whether the agent answered the caller. Do NOT speculate about backend state you cannot see.
+
 ARCHITECTURE NOTES (apply when relevant):
 - Realtime LLM (GPT Realtime) + Deepgram EOT + custom orchestrator → watch for TWO turn-detection systems conflicting (realtime server VAD vs Deepgram EOT). If 'Turn-taking owned by' is "Both" or "Unsure", flag as likely top cause; recommend one owner, disable the other. Attribute to custom orchestrator.
 - If latency p50 is low or 'measured as' is a single component (not end-to-end), do NOT blame robotic feel on latency.
@@ -361,11 +367,22 @@ Use timestamps as evidence for turn-taking. If NO timestamps, state turn-taking 
 Return ONLY valid JSON, no markdown, no preamble:
 {"scorecard":{"turn_management":0,"confirmation":0,"entity_capture":0,"empathy":0,"naturalness":0,"task_completion":0,"overall":0},"issues":[{"title":"short","owner":"Prompt|Config|Architecture","severity":"high|medium|low","evidence":"quote/timestamp","fix":"specific; name provider/value"}],"summary":"2 sentences naming the single highest-leverage fix"}
 Limit to 6 highest-leverage issues. Be concise.`;
-  const user=`=== STACK ===\n${stackText}\n\n=== TUNING ===\n${tuneText}\n\n=== AGENT PROMPT (behavior — grade this) ===\n${d.prompt||"(none provided)"}\n\n=== KNOWLEDGE BASE (reference only — use to check whether KB-grounded answers were factually correct; do NOT grade the agent's behavior against KB completeness) ===\n${d.kb&&d.kb.trim()?d.kb:"(not provided)"}\n\n=== TRANSCRIPT ===\n${transcript}`;
+  // The flow is SELECTED in the tool (New vs Existing). That selection is ground truth:
+  // routing already placed the agent in this flow upstream, so the judge must assume it is correct.
+  const pvTag=(d.promptVersion||"").toLowerCase();
+  let selectedFlow="unspecified";
+  if(pvTag.includes("existing"))selectedFlow="EXISTING customer";
+  else if(pvTag.includes("new"))selectedFlow="NEW customer";
+  const flowBlock=selectedFlow==="unspecified"?"":`=== SELECTED FLOW (GROUND TRUTH) ===
+This call has been designated a ${selectedFlow} call. The new-vs-existing routing is decided UPSTREAM by ANI lookup before the prompt runs, and the correct flow has ALREADY been loaded. Evaluate this strictly as a correctly-routed ${selectedFlow} call. Do NOT question, second-guess, or flag the routing/flow selection. Do NOT report "wrong FSM", "treated new as existing" (or vice versa), "skipped onboarding", or "improvised an undefined flow". For an EXISTING customer it is CORRECT to greet by name and reference an address/job already on file and to skip new-profile data capture. Judge only the conversation quality within this flow.
+
+`;
+  const user=`${flowBlock}=== STACK ===\n${stackText}\n\n=== TUNING ===\n${tuneText}\n\n=== AGENT PROMPT (behavior — grade this) ===\n${d.prompt||"(none provided)"}\n\n=== KNOWLEDGE BASE (reference only — use to check whether KB-grounded answers were factually correct; do NOT grade the agent's behavior against KB completeness) ===\n${d.kb&&d.kb.trim()?d.kb:"(not provided)"}\n\n=== TRANSCRIPT ===\n${transcript}`;
   try{
-    const res=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},
+    const res=await fetch(ENDPOINT,{method:"POST",headers:authHeaders({"Content-Type":"application/json"}),
       body:JSON.stringify({model:JUDGE_MODEL,max_tokens:2000,temperature:0,messages:[{role:"user",content:sys+"\n\n"+user}]})});
     let data;try{data=await res.json();}catch(_){data=null;}
+    if(res.status===401){clearSecret();resultsEl.innerHTML=`<div class="err"><b>Access denied.</b> Wrong or missing access secret — reload the page and enter it again.</div>`;return;}
     if(!res.ok||!data||data.error||data.type==="error"){
       const msg=(data&&data.error&&(data.error.message||data.error))||(data&&data.message)||("HTTP "+res.status);
       resultsEl.innerHTML=`<div class="err"><b>API error</b> — ${esc(String(msg))}<br><span class="mono" style="font-size:11px;color:var(--ink3)">Check: key valid? account has credits/billing? model "${esc(JUDGE_MODEL)}" available on this account?</span></div>`;return;
@@ -453,13 +470,24 @@ function exportCsv(){
 }
 function q(s){s=String(s||"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
 
+// ---- access secret (shared-secret gate) ----
+const AUTH_REQUIRED=!!window.NOVA_AUTH_REQUIRED;
+function getSecret(){
+  if(!AUTH_REQUIRED)return "";
+  let s=null;try{s=localStorage.getItem("zuper_nova_secret");}catch(e){}
+  if(!s){s=prompt("Enter the Nova Eval access secret:")||"";try{localStorage.setItem("zuper_nova_secret",s);}catch(e){}}
+  return s;
+}
+function authHeaders(base){base=base||{};if(AUTH_REQUIRED)base["x-nova-secret"]=getSecret();return base;}
+function clearSecret(){try{localStorage.removeItem("zuper_nova_secret");}catch(e){}}
+
 // ---- GitHub-versioned source (served by the Render proxy from the repo) ----
 const hasRepo=!!window.NOVA_HAS_REPO;
 let manifest=null,currentFlow="new-customer";
 async function loadManifest(){
   if(!hasRepo)return;
   try{
-    manifest=await (await fetch("/api/manifest")).json();
+    manifest=await (await fetch("/api/manifest",{headers:authHeaders()})).json();
     document.getElementById("sourceCard").style.display="block";
     fillSrc();
   }catch(e){/* no repo reachable — manual paste/import still works */}
@@ -480,9 +508,9 @@ if(loadRepoBtn)loadRepoBtn.onclick=async()=>{
   const kv=document.getElementById("srcKb").value;
   const cv=document.getElementById("srcConfig").value;
   try{
-    if(pv){promptEl.value=await (await fetch(`/api/file?type=prompt&flow=${encodeURIComponent(currentFlow)}&version=${encodeURIComponent(pv)}`)).text();pvEl.value=`${currentFlow} / ${pv}`;}
-    kbEl.value = kv ? await (await fetch(`/api/file?type=kb&version=${encodeURIComponent(kv)}`)).text() : "";
-    if(cv){const cfg=JSON.parse(await (await fetch(`/api/file?type=config&version=${encodeURIComponent(cv)}`)).text());
+    if(pv){promptEl.value=await (await fetch(`/api/file?type=prompt&flow=${encodeURIComponent(currentFlow)}&version=${encodeURIComponent(pv)}`,{headers:authHeaders()})).text();pvEl.value=`${currentFlow} / ${pv}`;}
+    kbEl.value = kv ? await (await fetch(`/api/file?type=kb&version=${encodeURIComponent(kv)}`,{headers:authHeaders()})).text() : "";
+    if(cv){const cfg=JSON.parse(await (await fetch(`/api/file?type=config&version=${encodeURIComponent(cv)}`,{headers:authHeaders()})).text());
       writeAll({stack:cfg.stack,tune:cfg.tune}); if(cfg.configLabel)clEl.value=cfg.configLabel;}
     updateTs();save();
     document.getElementById("srcMeta").textContent=`loaded: ${currentFlow}/${pv||"—"} · kb ${kv||"none"} · cfg ${cv||"—"}`;
