@@ -364,9 +364,17 @@ ARCHITECTURE NOTES (apply when relevant):
 
 Use timestamps as evidence for turn-taking. If NO timestamps, state turn-taking cannot be assessed; do NOT invent overlap. Make fixes concrete and improvement-oriented.
 
+ALWAYS-REPORT CALLER-EXPERIENCE CATEGORY (never drop these to stay under the issue limit — they are pinned and outrank routine technical findings for inclusion):
+- RE-ASKING volunteered info: the agent asks for something the caller already stated earlier in the call (urgency, timing, name, address, contact method). Always report as its own issue with the caller's original quote AND the agent's later re-ask, both with timestamps.
+- CALLER FRUSTRATION / PUSHBACK: any sign the caller is annoyed, correcting the agent, or repeating themselves (e.g. "it's a rhetorical question", "that's my number", "I already told you", audible exasperation). Always report, quoting the caller.
+- IGNORED URGENCY: caller states urgency ("as soon as possible", "before the weekend", "immediately") and the agent does not acknowledge it or carry it forward, or asks unhurried/diagnostic questions instead of moving to scheduling. Always report.
+These are owner "Prompt" unless clearly a turn-taking/config artifact. If none are present in the transcript, omit silently — do not fabricate.
+
+GROUP the issues: list TECHNICAL issues first (owner Config/Platform/Prompt-FSM: turn-taking, EOT, temperature, STT, entity capture, FSM compliance), then CONVERSATIONAL issues (empathy, naturalness, re-asking, frustration, urgency). Order each group by severity. The pinned caller-experience items must appear even if they rank below routine technical ones.
+
 Return ONLY valid JSON, no markdown, no preamble:
-{"scorecard":{"turn_management":0,"confirmation":0,"entity_capture":0,"empathy":0,"naturalness":0,"task_completion":0,"overall":0},"issues":[{"title":"short","owner":"Prompt|Config|Architecture","severity":"high|medium|low","evidence":"quote/timestamp","fix":"specific; name provider/value"}],"summary":"2 sentences naming the single highest-leverage fix"}
-Limit to 6 highest-leverage issues. Be concise.`;
+{"scorecard":{"turn_management":0,"confirmation":0,"entity_capture":0,"empathy":0,"naturalness":0,"task_completion":0,"overall":0},"issues":[{"title":"short","owner":"Prompt|Config|Architecture","severity":"high|medium|low","class":"technical|conversational","evidence":"quote/timestamp","fix":"specific; name provider/value"}],"summary":"2 sentences naming the single highest-leverage fix"}
+Limit to 10 highest-leverage issues (was 6), but ALWAYS include every applicable pinned caller-experience item even if that means dropping a lower-value technical one. Be concise.`;
   // The flow is SELECTED in the tool (New vs Existing). That selection is ground truth:
   // routing already placed the agent in this flow upstream, so the judge must assume it is correct.
   // Prefer the LIVE toggle (currentFlow) when the repo Source card is in use; otherwise read the tag.
@@ -421,10 +429,16 @@ function render(r,d){
   SCORE_KEYS.forEach(([k,label])=>{const v=r.scorecard[k]??0;const c=v>=8?"#059669":v>=6?"#D97706":"#DC2626";
     html+=`<div class="score-row"><span class="sl">${label}</span><div class="bar"><span style="width:${v*10}%;background:${c}"></span></div><span class="sv">${v}/10</span></div>`;});
   html+=`</div></div>`;
-  (r.issues||[]).forEach(iss=>{const L=LANES[iss.owner]||LANES.Prompt;const sc=SEV[iss.severity]||SEV.low;
+  const _issues=(r.issues||[]).slice().sort((a,b)=>{
+    const rank=x=>x==="conversational"?1:0; // technical first, conversational second
+    return rank(a.class)-rank(b.class);
+  });
+  _issues.forEach(iss=>{const L=LANES[iss.owner]||LANES.Prompt;const sc=SEV[iss.severity]||SEV.low;
+    const cls=iss.class==="conversational"?{t:"conversational",c:"#B5731A"}:(iss.class==="technical"?{t:"technical",c:"#5A4942"}:null);
     html+=`<div class="issue" style="border-left-color:${L.raw}">
       <div class="itop"><span class="pill" style="background:${L.raw}1f;color:${L.raw}">${iss.owner}</span>
         <span class="pill" style="color:${sc};background:${sc}18">${iss.severity}</span>
+        ${cls?`<span class="pill" style="color:${cls.c};background:${cls.c}14">${cls.t}</span>`:""}
         <span class="ititle">${esc(iss.title)}</span></div>
       ${iss.evidence?`<div class="ev mono" style="border-left-color:${L.raw}">${esc(iss.evidence)}</div>`:""}
       <div class="fix"><span class="k">Fix → </span>${esc(iss.fix)}</div></div>`;});
