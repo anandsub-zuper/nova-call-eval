@@ -507,7 +507,28 @@ function fillSrc(){
   const cs=manifest.configs||[];
   document.getElementById("srcConfig").innerHTML=cs.length?cs.map(v=>`<option>${v}</option>`).join(""):`<option value="">(none)</option>`;
 }
-document.querySelectorAll('.seg').forEach(b=>b.addEventListener("click",()=>{currentFlow=b.dataset.flow;fillSrc();}));
+async function refreshManifest(){
+  try{ manifest=await (await fetch("/api/manifest",{headers:authHeaders()})).json(); }catch(e){}
+}
+async function autoLoadPrompt(){
+  // Load the currently-selected flow + prompt version straight into the prompt box,
+  // so the box ALWAYS matches the New/Existing toggle without a separate click.
+  const pv=document.getElementById("srcPrompt").value;
+  if(!pv)return;
+  try{
+    promptEl.value=await (await fetch(`/api/file?type=prompt&flow=${encodeURIComponent(currentFlow)}&version=${encodeURIComponent(pv)}`,{headers:authHeaders()})).text();
+    pvEl.value=`${currentFlow} / ${pv}`;
+    updateTs();save();
+    const m=document.getElementById("srcMeta"); if(m)m.textContent=`prompt loaded: ${currentFlow} / ${pv}`;
+  }catch(e){ const m=document.getElementById("srcMeta"); if(m)m.textContent="load failed — click Load selected from repo"; }
+}
+document.querySelectorAll('.seg').forEach(b=>b.addEventListener("click",async()=>{
+  currentFlow=b.dataset.flow;
+  await refreshManifest();   // pick up any newly pushed versions (e.g. existing v2)
+  fillSrc();                 // repopulate version dropdowns for this flow
+  await autoLoadPrompt();    // immediately swap the prompt box to this flow's prompt
+}));
+document.getElementById("srcPrompt").addEventListener("change",autoLoadPrompt); // changing version also reloads
 const loadRepoBtn=document.getElementById("loadRepoBtn");
 if(loadRepoBtn)loadRepoBtn.onclick=async()=>{
   const pv=document.getElementById("srcPrompt").value;
