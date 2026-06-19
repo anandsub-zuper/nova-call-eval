@@ -15,9 +15,19 @@ const API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL   = process.env.NOVA_JUDGE_MODEL || "claude-sonnet-4-6";
 const PORT    = process.env.PORT || 3000;
 const ROOT    = __dirname;
+const ACCESS  = process.env.NOVA_ACCESS_SECRET || ""; // if set, all /api/* calls require this secret
 if (!API_KEY) { console.error("Set ANTHROPIC_API_KEY before starting."); process.exit(1); }
 
 app.use(express.json({ limit: "10mb" }));
+
+// Shared-secret gate: if NOVA_ACCESS_SECRET is set, every /api/* call must send it.
+// The page sends it as the "x-nova-secret" header. No secret set = open (dev only).
+app.use("/api", (req, res, next) => {
+  if (!ACCESS) return next();
+  if (req.get("x-nova-secret") === ACCESS) return next();
+  return res.status(401).json({ error: { message: "unauthorized: missing or wrong access secret" } });
+});
+
 const safe = s => /^[a-z0-9._-]+$/i.test(s || "");
 
 // List available versioned content by scanning the repo folders.
@@ -55,7 +65,7 @@ app.get("/api/file", (req, res) => {
 // Serve the tool; inject endpoint + repo flag so the page wires itself up.
 app.get("/", (req, res) => {
   let html = fs.readFileSync(path.join(ROOT, "nova_call_eval.html"), "utf8");
-  const inject = `<script>window.NOVA_EVAL_ENDPOINT="/api/eval";window.NOVA_JUDGE_MODEL=${JSON.stringify(MODEL)};window.NOVA_HAS_REPO=true;</script>`;
+  const inject = `<script>window.NOVA_EVAL_ENDPOINT="/api/eval";window.NOVA_JUDGE_MODEL=${JSON.stringify(MODEL)};window.NOVA_HAS_REPO=true;window.NOVA_AUTH_REQUIRED=${ACCESS?"true":"false"};</script>`;
   html = html.replace("</head>", inject + "</head>");
   res.type("html").send(html);
 });
@@ -64,7 +74,7 @@ app.use(express.static(ROOT));
 // Eval proxy — holds the key server-side, passes upstream errors through.
 app.post("/api/eval", async (req, res) => {
   try {
-    const body = { ...req.body, model: req.body.model || MODEL, max_tokens: req.body.max_tokens || 2000 };
+    const body = { ...req.body, model: req.body.model || MODEL, max_tokens: req.body.max_tokens || 4000 };
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": API_KEY, "anthropic-version": "2023-06-01" },

@@ -393,7 +393,7 @@ This call has been designated a ${selectedFlow} call. The new-vs-existing routin
   const user=`${flowBlock}=== STACK ===\n${stackText}\n\n=== TUNING ===\n${tuneText}\n\n=== AGENT PROMPT (behavior — grade this) ===\n${d.prompt||"(none provided)"}\n\n=== KNOWLEDGE BASE (reference only — use to check whether KB-grounded answers were factually correct; do NOT grade the agent's behavior against KB completeness) ===\n${d.kb&&d.kb.trim()?d.kb:"(not provided)"}\n\n=== TRANSCRIPT ===\n${transcript}`;
   try{
     const res=await fetch(ENDPOINT,{method:"POST",headers:authHeaders({"Content-Type":"application/json"}),
-      body:JSON.stringify({model:JUDGE_MODEL,max_tokens:2000,temperature:0,messages:[{role:"user",content:sys+"\n\n"+user}]})});
+      body:JSON.stringify({model:JUDGE_MODEL,max_tokens:4000,temperature:0,messages:[{role:"user",content:sys+"\n\n"+user}]})});
     let data;try{data=await res.json();}catch(_){data=null;}
     if(res.status===401){clearSecret();resultsEl.innerHTML=`<div class="err"><b>Access denied.</b> Wrong or missing access secret — reload the page and enter it again.</div>`;return;}
     if(!res.ok||!data||data.error||data.type==="error"){
@@ -408,16 +408,47 @@ This call has been designated a ${selectedFlow} call. The new-vs-existing routin
       if(s>=0&&e>s)raw=raw.slice(s,e+1);
       parsed=JSON.parse(raw);
     }
-    catch(pe){resultsEl.innerHTML=`<div class="err"><b>Model didn't return clean JSON</b> (likely truncated). Try again. First 400 chars:<br><span class="mono" style="font-size:11px">${esc(text.slice(0,400))}</span></div>`;return;}
+    catch(pe){
+      // Salvage a truncated response: recover the scorecard and any COMPLETE issue objects.
+      const sal=salvageTruncated(text);
+      if(sal){parsed=sal;parsed.__truncated=true;}
+      else{resultsEl.innerHTML=`<div class="err"><b>Model didn't return clean JSON</b> (likely truncated). Try again. First 400 chars:<br><span class="mono" style="font-size:11px">${esc(text.slice(0,400))}</span></div>`;return;}
+    }
     render(parsed,d);logRun(parsed,d);
   }catch(e){resultsEl.innerHTML=`<div class="err"><b>Network/proxy error</b> — ${esc(e.message||String(e))}.<br><span class="mono" style="font-size:11px;color:var(--ink3)">If this says "Failed to fetch", the page is calling Anthropic directly (CORS) — confirm the deployed server.js is the Render version that injects /api/eval.</span></div>`;}
   finally{runBtn.disabled=false;runIco.textContent="▶";runTxt.textContent="Run evaluation";}
 };
 
+function salvageTruncated(text){
+  // Best-effort recovery from a response truncated mid-JSON: scorecard + complete issue objects.
+  try{
+    let raw=text.replace(/```json/gi,"").replace(/```/g,"").trim();
+    const out={scorecard:null,issues:[],summary:""};
+    const sc=raw.match(/"scorecard"\s*:\s*\{[^}]*\}/);
+    if(sc){try{out.scorecard=JSON.parse("{"+sc[0]+"}").scorecard;}catch(_){}}
+    const ix=raw.indexOf('"issues"');
+    if(ix>=0){
+      const arrStart=raw.indexOf("[",ix);
+      let i=arrStart+1,depth=0,objStart=-1;
+      while(i<raw.length){
+        const c=raw[i];
+        if(c==="{"){if(depth===0)objStart=i;depth++;}
+        else if(c==="}"){depth--;if(depth===0&&objStart>=0){try{out.issues.push(JSON.parse(raw.slice(objStart,i+1)));}catch(_){}objStart=-1;}}
+        else if(c==="]"&&depth===0)break;
+        i++;
+      }
+    }
+    const sm=raw.match(/"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if(sm){try{out.summary=JSON.parse('"'+sm[1]+'"');}catch(_){out.summary=sm[1];}}
+    if(out.scorecard||out.issues.length)return out;
+  }catch(_){}
+  return null;
+}
 function render(r,d){
   const counts=Object.keys(LANES).map(k=>[k,(r.issues||[]).filter(i=>i.owner===k).length]);
   const _flow=window.__novaSelectedFlow||"unspecified";
   let html=`<div class="reslabel">Result · ${d.promptVersion||"untagged"} · ${d.configLabel||"untagged"} · evaluated as: ${_flow}</div>`;
+  if(r.__truncated)html+=`<div class="err" style="margin-bottom:12px">⚠ Response was truncated — recovered the scorecard and ${(r.issues||[]).length} complete issue(s); a few lower-ranked issues may be missing. Re-run for the full list.</div>`;
   html+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
     <span class="ttl" style="font-size:14px;font-weight:800">Where the fixes go</span>
     <span class="ov">Overall <b>${r.scorecard.overall}</b>/10</span></div><div class="lanes">`;
