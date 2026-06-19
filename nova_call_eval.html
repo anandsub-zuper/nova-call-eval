@@ -369,12 +369,17 @@ Return ONLY valid JSON, no markdown, no preamble:
 Limit to 6 highest-leverage issues. Be concise.`;
   // The flow is SELECTED in the tool (New vs Existing). That selection is ground truth:
   // routing already placed the agent in this flow upstream, so the judge must assume it is correct.
-  const pvTag=(d.promptVersion||"").toLowerCase();
+  // Prefer the LIVE toggle (currentFlow) when the repo Source card is in use; otherwise read the tag.
+  let flowSrc="";
+  try{ flowSrc = (window.NOVA_HAS_REPO && typeof currentFlow!=="undefined") ? currentFlow : (d.promptVersion||""); }
+  catch(_){ flowSrc = (d.promptVersion||""); }
+  flowSrc=(flowSrc||"").toLowerCase();
   let selectedFlow="unspecified";
-  if(pvTag.includes("existing"))selectedFlow="EXISTING customer";
-  else if(pvTag.includes("new"))selectedFlow="NEW customer";
+  if(flowSrc.includes("existing"))selectedFlow="EXISTING customer";
+  else if(flowSrc.includes("new"))selectedFlow="NEW customer";
+  window.__novaSelectedFlow=selectedFlow; // surfaced in the result header as a deploy/flow check
   const flowBlock=selectedFlow==="unspecified"?"":`=== SELECTED FLOW (GROUND TRUTH) ===
-This call has been designated a ${selectedFlow} call. The new-vs-existing routing is decided UPSTREAM by ANI lookup before the prompt runs, and the correct flow has ALREADY been loaded. Evaluate this strictly as a correctly-routed ${selectedFlow} call. Do NOT question, second-guess, or flag the routing/flow selection. Do NOT report "wrong FSM", "treated new as existing" (or vice versa), "skipped onboarding", or "improvised an undefined flow". For an EXISTING customer it is CORRECT to greet by name and reference an address/job already on file and to skip new-profile data capture. Judge only the conversation quality within this flow.
+This call has been designated a ${selectedFlow} call. The new-vs-existing routing is decided UPSTREAM by ANI lookup before the prompt runs, and the correct flow has ALREADY been loaded. Evaluate this strictly as a correctly-routed ${selectedFlow} call. Do NOT question, second-guess, or flag the routing/flow selection. Do NOT report "wrong FSM", "treated new as existing" (or vice versa), "skipped onboarding", "ignored FSM", or "improvised an undefined flow". For an EXISTING customer it is CORRECT to greet by name, to reference an address or job already on file WITHOUT collecting it in this call, and to skip new-profile data capture — never call an on-file address "hallucinated" or "referenced without collection" in the existing-customer flow. Judge only the conversation quality within this flow.
 
 `;
   const user=`${flowBlock}=== STACK ===\n${stackText}\n\n=== TUNING ===\n${tuneText}\n\n=== AGENT PROMPT (behavior — grade this) ===\n${d.prompt||"(none provided)"}\n\n=== KNOWLEDGE BASE (reference only — use to check whether KB-grounded answers were factually correct; do NOT grade the agent's behavior against KB completeness) ===\n${d.kb&&d.kb.trim()?d.kb:"(not provided)"}\n\n=== TRANSCRIPT ===\n${transcript}`;
@@ -403,7 +408,8 @@ This call has been designated a ${selectedFlow} call. The new-vs-existing routin
 
 function render(r,d){
   const counts=Object.keys(LANES).map(k=>[k,(r.issues||[]).filter(i=>i.owner===k).length]);
-  let html=`<div class="reslabel">Result · ${d.promptVersion||"untagged"} · ${d.configLabel||"untagged"}</div>`;
+  const _flow=window.__novaSelectedFlow||"unspecified";
+  let html=`<div class="reslabel">Result · ${d.promptVersion||"untagged"} · ${d.configLabel||"untagged"} · evaluated as: ${_flow}</div>`;
   html+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
     <span class="ttl" style="font-size:14px;font-weight:800">Where the fixes go</span>
     <span class="ov">Overall <b>${r.scorecard.overall}</b>/10</span></div><div class="lanes">`;
